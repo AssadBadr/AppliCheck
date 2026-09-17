@@ -20,24 +20,27 @@ export default function ApplicantStatus() {
   const [lastRefresh, setLastRefresh] = useState(null)
 
   const fetchStatus = async () => {
-    // Fetch application row
-    const { data: appData, error: appErr } = await supabase
-      .from('grant_applications')
-      .select('*')
-      .eq('id', id)
-      .single()
+    // Support short ref ID (8 chars) or full UUID
+    let appData = null
+    if (id.length === 8) {
+      const { data: allApps } = await supabase.from('grant_applications').select('*')
+      appData = allApps?.find(a => a.id.replace(/-/g, '').slice(0, 8).toUpperCase() === id.toUpperCase())
+    } else {
+      const { data } = await supabase.from('grant_applications').select('*').eq('id', id).single()
+      appData = data
+    }
 
-    if (appErr || !appData) {
+    if (!appData) {
       setError('Application not found. Please check your reference ID.')
       setLoading(false)
       return
     }
 
-    // Fetch messages for this application (from the messages table)
+    // Fetch messages using the real full UUID
     const { data: msgData } = await supabase
       .from('messages')
       .select('*')
-      .eq('application_id', id)
+      .eq('application_id', appData.id)
       .eq('sender_type', 'foundation')
       .order('sent_at', { ascending: false })
 

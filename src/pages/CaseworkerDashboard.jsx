@@ -556,7 +556,7 @@ export default function CaseworkerDashboard() {
                   </p>
                   {selectedApp.fullId && (
                     <a
-                      href={`/status/${selectedApp.fullId}`}
+                      href={`/status/${selectedApp.id}`}
                       target="_blank"
                       rel="noreferrer"
                       className="status-link"

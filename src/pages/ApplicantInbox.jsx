@@ -20,22 +20,30 @@ export default function ApplicantInbox() {
 
   async function fetchData() {
     try {
-      // Fetch application
-      const { data: appData, error: appError } = await supabase
-        .from('grant_applications')
-        .select('*')
-        .eq('id', id)
-        .single()
+      // Support both short ref ID (8 chars) and full UUID
+      let query = supabase.from('grant_applications').select('*')
+      if (id.length === 8) {
+        // Short ref ID — fetch all and find matching
+        const { data: allApps, error: allErr } = await supabase
+          .from('grant_applications').select('*')
+        if (allErr) throw allErr
+        const match = allApps?.find(a => a.id.replace(/-/g, '').slice(0, 8).toUpperCase() === id.toUpperCase())
+        if (!match) throw new Error('Application not found for ref ID: ' + id)
+        query = supabase.from('grant_applications').select('*').eq('id', match.id).single()
+      } else {
+        query = query.eq('id', id).single()
+      }
 
+      const { data: appData, error: appError } = await query
       if (appError) throw appError
       setApplication(appData)
 
-      // Fetch messages - only show messages FROM foundation TO applicant
+      // Fetch messages using the real full UUID
       const { data: msgData, error: msgError } = await supabase
         .from('messages')
         .select('*')
-        .eq('application_id', id)
-        .eq('sender_type', 'foundation')  // Only show foundation messages
+        .eq('application_id', appData.id)
+        .eq('sender_type', 'foundation')
         .order('sent_at', { ascending: false })
 
       if (msgError) throw msgError
