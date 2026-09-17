@@ -95,8 +95,30 @@ export default function CaseworkerDashboard() {
 
   useEffect(() => {
     fetchApplications()
-    const interval = setInterval(fetchApplications, 30_000)
-    return () => clearInterval(interval)
+    // Poll every 5s so resubmissions appear almost instantly
+    const interval = setInterval(fetchApplications, 5_000)
+
+    // Also subscribe to Supabase Realtime for instant updates
+    const channel = SUPABASE_READY
+      ? supabase
+          .channel('grant_applications_changes')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'grant_applications' },
+            (payload) => {
+              fetchApplications()
+              // If the currently open app was updated, refresh it too
+              setSelectedApp(prev => {
+                if (!prev || prev.fullId !== payload.new.id) return prev
+                return rowToApp(payload.new)
+              })
+            }
+          )
+          .subscribe()
+      : null
+
+    return () => {
+      clearInterval(interval)
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [fetchApplications])
 
   // ── Helpers ───────────────────────────────────────────────────────────────

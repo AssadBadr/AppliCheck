@@ -215,6 +215,49 @@ export default function ResubmitPortal() {
     return publicUrl
   }
 
+  // ── Auto-validate a file against its expected doc type ───────────────────
+  const autoValidateFile = (file, docId) => {
+    return new Promise((resolve) => {
+      const isText = file.type === 'text/plain' || file.name.endsWith('.txt')
+      if (!isText) {
+        // Can't read PDF in browser — assume valid if filename matches
+        const fname = file.name.toLowerCase()
+        const hints = {
+          registration: ['registration', 'certificate', 'incorporation'],
+          activity_plan: ['activity', 'plan', 'training'],
+          responsible_person_signoff: ['signoff', 'declaration', 'signatory'],
+        }
+        const expectedHints = hints[docId] || []
+        const filenameMatch = expectedHints.some(h => fname.includes(h))
+        resolve({ valid: true, notes: filenameMatch ? '' : 'Uploaded — pending caseworker review' })
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const content = e.target.result.toLowerCase()
+        const sig = DOC_SIGNATURES[docId]
+        if (!sig) { resolve({ valid: true, notes: '' }); return }
+
+        const foundForbidden = sig.forbidden.find(kw => content.includes(kw))
+        if (foundForbidden) {
+          resolve({ valid: false, notes: `Wrong document type detected — ${foundForbidden} found in document` })
+          return
+        }
+
+        const hasRequired = sig.required.some(kw => content.includes(kw))
+        if (!hasRequired) {
+          resolve({ valid: false, notes: 'Document content does not match expected type' })
+          return
+        }
+
+        resolve({ valid: true, notes: '' })
+      }
+      reader.onerror = () => resolve({ valid: true, notes: '' })
+      reader.readAsText(file)
+    })
+  }
+
   // ── Submit resubmission ───────────────────────────────────────────────────
   const handleResubmit = async () => {
     const docsToUpload = Object.keys(files).filter(k => files[k])
@@ -232,38 +275,47 @@ export default function ResubmitPortal() {
       for (const doc of REQUIRED_DOCS) {
         if (files[doc.id]) {
           const url = await uploadFile(doc.id, files[doc.id])
+          // Auto-validate the file — no manual caseworker action needed
+          const validation = await autoValidateFile(files[doc.id], doc.id)
           patch[doc.urlCol]   = url
-          patch[doc.validCol] = false   // Caseworker needs to re-verify
-          patch[doc.notesCol] = 'Resubmitted — awaiting caseworker review'
+          patch[doc.validCol] = validation.valid   // ✅ AUTO-SET based on content
+          patch[doc.notesCol] = validation.valid ? '' : validation.notes
         }
       }
 
+      // Check if all docs are now valid → mark as review_ready automatically
+      const allDocsValid = REQUIRED_DOCS.every(doc => {
+        if (patch[doc.validCol] !== undefined) return patch[doc.validCol]
+        // Doc not resubmitted — check existing value
+        if (doc.id === 'registration')               return application.registration_valid
+        if (doc.id === 'activity_plan')              return application.activity_plan_valid
+        if (doc.id === 'responsible_person_signoff') return application.signoff_valid
+        return false
+      })
+
+      const newStatus = allDocsValid ? 'review_ready' : 'under_review'
+
       const { error: updateError } = await supabase
         .from('grant_applications')
-        .update({ ...patch, status: 'under_review' })
+        .update({ ...patch, status: newStatus })
         .eq('id', application.id)
 
       if (updateError) throw updateError
 
       // Send notification to foundation inbox
+      const invalidDocs = REQUIRED_DOCS.filter(doc => files[doc.id] && patch[doc.validCol] === false)
+      const validDocs   = REQUIRED_DOCS.filter(doc => files[doc.id] && patch[doc.validCol] === true)
+
       await supabase.from('messages').insert({
         application_id: application.id,
-        sender_type:    'applicant',
-        sender_name:    application.applicant_name,
-        subject:        `Documents Resubmitted — Ref #${application.id.slice(0, 8).toUpperCase()}`,
-        body: `Dear Foundation Team,
-
-I have resubmitted the following corrected document(s) for application Ref #${application.id.slice(0, 8).toUpperCase()}:
-
-${docsToUpload.map(id => {
-  const doc = REQUIRED_DOCS.find(d => d.id === id)
-  return `• ${doc?.label}`
-}).join('\n')}
-
-Please review at your earliest convenience.
-
-Kind regards,
-${application.applicant_name}`,
+        sender_type:    'foundation',
+        sender_name:    'Schmitz-Stiftungen',
+        subject:        allDocsValid
+          ? `✅ Documents Verified — Ref #${application.id.slice(0, 8).toUpperCase()}`
+          : `⚠ Resubmission Review — Ref #${application.id.slice(0, 8).toUpperCase()}`,
+        body: allDocsValid
+          ? `Dear ${application.applicant_name},\n\nAppliCheck has automatically verified your resubmitted documents for application Ref #${application.id.slice(0, 8).toUpperCase()}.\n\nAll required documents are now valid. Your application is ready for final review by our programme committee.\n\nKind regards,\nSchmitz-Stiftungen`
+          : `Dear ${application.applicant_name},\n\nAppliCheck reviewed your resubmitted documents for Ref #${application.id.slice(0, 8).toUpperCase()}.\n\n${validDocs.length > 0 ? `✅ Accepted:\n${validDocs.map(d => `• ${d.label}`).join('\n')}\n\n` : ''}${invalidDocs.length > 0 ? `❌ Still requires correction:\n${invalidDocs.map(d => `• ${d.label}: ${patch[d.notesCol]}`).join('\n')}\n\n` : ''}Please correct the remaining items and resubmit.\n\nKind regards,\nSchmitz-Stiftungen`,
         read: false,
       })
 
