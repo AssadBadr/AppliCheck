@@ -89,8 +89,9 @@ export default function CaseworkerDashboard() {
       setApplications(initialData.applications)
       setUsingDemo(true)
     } else {
-      setApplications(data.length > 0 ? data.map(rowToApp) : initialData.applications)
-      setUsingDemo(data.length === 0)
+      const active = data.filter(r => r.status !== 'approved' && r.status !== 'rejected')
+      setApplications(active.length > 0 ? active.map(rowToApp) : initialData.applications)
+      setUsingDemo(active.length === 0 && data.length === 0)
     }
     setLoading(false)
     setLastRefresh(new Date())
