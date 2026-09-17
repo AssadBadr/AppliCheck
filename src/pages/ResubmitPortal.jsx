@@ -81,55 +81,72 @@ export default function ResubmitPortal() {
     responsible_person_signoff: 'Authorised Signatory Declaration',
   }
 
-  const validateDocumentContent = (file, docId) => {
-    return new Promise((resolve) => {
-      // Only validate text-readable files
-      const isText = file.type === 'text/plain' || file.name.endsWith('.txt')
-      if (!isText) {
-        resolve({ valid: true }) // Can't read PDFs in browser — skip deep check
-        return
-      }
+  const validateDocumentContent = async (file, docId) => {
+    const fname = file.name.toLowerCase()
+    const isText = file.type === 'text/plain' || file.name.endsWith('.txt')
 
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const content = e.target.result.toLowerCase()
-        const sig = DOC_SIGNATURES[docId]
-        if (!sig) { resolve({ valid: true }); return }
+    // Filename-based cross-slot detection (works for all file types incl. PDFs)
+    const FILENAME_HINTS = {
+      registration: ['registration', 'certificate', 'incorporation'],
+      activity_plan: ['activity', 'plan', 'training', 'curriculum'],
+      responsible_person_signoff: ['signoff', 'sign-off', 'declaration', 'signatory', 'authorization', 'authoris'],
+    }
 
-        // Check forbidden keywords — document is clearly the wrong type
-        const foundForbidden = sig.forbidden.find(kw => content.includes(kw))
-        if (foundForbidden) {
-          // Try to identify what the file actually IS
-          let detectedAs = 'a different document type'
-          if (content.includes('certificate of incorporation') || content.includes('registration number')) {
-            detectedAs = 'an Organisation Registration Document'
-          } else if (content.includes('activity plan') || content.includes('training activities')) {
-            detectedAs = 'an Activity Plan'
-          } else if (content.includes('declaration') || content.includes('authorised signatory')) {
-            detectedAs = 'an Authorised Signatory Declaration'
+    for (const [otherType, hints] of Object.entries(FILENAME_HINTS)) {
+      if (otherType !== docId && hints.some(h => fname.includes(h))) {
+        const expectedHints = FILENAME_HINTS[docId]
+        if (!expectedHints.some(h => fname.includes(h))) {
+          return {
+            valid: false,
+            error: `Wrong document! This file looks like a "${DOC_LABELS_SHORT[otherType]}" but this slot expects a "${DOC_LABELS_SHORT[docId]}". Please upload the correct file.`,
           }
-          resolve({
-            valid: false,
-            error: `Wrong document detected. This file appears to be ${detectedAs}, but the "${DOC_LABELS_SHORT[docId]}" slot expects a different document. Please upload the correct file.`,
-          })
-          return
         }
-
-        // Check required keywords — document doesn't look like the right type
-        const hasRequired = sig.required.some(kw => content.includes(kw))
-        if (!hasRequired) {
-          resolve({
-            valid: false,
-            error: `This file does not appear to be a valid "${DOC_LABELS_SHORT[docId]}". Please check you are uploading the correct document.`,
-          })
-          return
-        }
-
-        resolve({ valid: true })
       }
-      reader.onerror = () => resolve({ valid: true }) // On error, allow upload
-      reader.readAsText(file)
-    })
+    }
+
+    // Deep content check for text files
+    if (isText) {
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const content = e.target.result.toLowerCase()
+          const sig = DOC_SIGNATURES[docId]
+          if (!sig) { resolve({ valid: true }); return }
+
+          const foundForbidden = sig.forbidden.find(kw => content.includes(kw))
+          if (foundForbidden) {
+            let detectedAs = 'a different document type'
+            if (content.includes('certificate of incorporation') || content.includes('registration number')) {
+              detectedAs = 'an Organisation Registration Document'
+            } else if (content.includes('activity plan') || content.includes('training activities')) {
+              detectedAs = 'an Activity Plan'
+            } else if (content.includes('declaration') || content.includes('authorised signatory')) {
+              detectedAs = 'an Authorised Signatory Declaration'
+            }
+            resolve({
+              valid: false,
+              error: `Wrong document! This file appears to be ${detectedAs}. The "${DOC_LABELS_SHORT[docId]}" slot expects a different document.`,
+            })
+            return
+          }
+
+          const hasRequired = sig.required.some(kw => content.includes(kw))
+          if (!hasRequired) {
+            resolve({
+              valid: false,
+              error: `This file doesn't look like a "${DOC_LABELS_SHORT[docId]}". Please upload the correct document.`,
+            })
+            return
+          }
+
+          resolve({ valid: true })
+        }
+        reader.onerror = () => resolve({ valid: true })
+        reader.readAsText(file)
+      })
+    }
+
+    return { valid: true }
   }
 
   const handleFileChange = async (docId, file) => {
