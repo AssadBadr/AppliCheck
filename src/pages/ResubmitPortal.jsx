@@ -210,7 +210,7 @@ export default function ResubmitPortal() {
       }
 
       if (!match) {
-        setLookupError('No application found. Please check your reference ID, organisation name and email.')
+        setLookupError('No application found. Please check your organisation name and email.')
         setLooking(false)
         return
       }
