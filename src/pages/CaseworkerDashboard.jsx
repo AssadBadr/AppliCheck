@@ -614,16 +614,7 @@ export default function CaseworkerDashboard() {
                       </span>
                     )}
                   </p>
-                  {selectedApp.fullId && (
-                    <a
-                      href={`/status/${selectedApp.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="status-link"
-                    >
-                      🔗 View applicant portal ↗
-                    </a>
-                  )}
+
                 </div>
                 {isReviewReady(selectedApp) && (
                   <div className="ready-badge">
