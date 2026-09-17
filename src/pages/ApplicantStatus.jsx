@@ -93,8 +93,11 @@ export default function ApplicantStatus() {
   const pct        = docs.length > 0 ? Math.round(docs.filter(d => d.url && d.valid).length / docs.length * 100) : 0
   const completed  = docs.filter(d => d.url && d.valid).length
 
-  const statusLabel = allValid ? 'Review Ready' : 'Under Review'
-  const statusClass = allValid ? 'ready' : 'pending'
+  const isRejected = app?.status === 'rejected'
+  const isApproved = app?.status === 'approved'
+
+  const statusLabel = isApproved ? 'Approved' : isRejected ? 'Not Approved' : allValid ? 'Review Ready' : 'Under Review'
+  const statusClass = isApproved ? 'ready' : isRejected ? 'rejected' : allValid ? 'ready' : 'pending'
 
   // ── loading / error screens ────────────────────────────────────────────────
   if (loading) {
@@ -138,7 +141,7 @@ export default function ApplicantStatus() {
         </div>
         <div className="status-header-right">
           <div className={`status-pill ${statusClass}`}>
-            {allValid ? '✓' : '⏳'} {statusLabel}
+            {isApproved ? '✓' : isRejected ? '✗' : allValid ? '✓' : '⏳'} {statusLabel}
           </div>
           {lastRefresh && (
             <span className="refresh-label">
@@ -163,6 +166,32 @@ export default function ApplicantStatus() {
           </div>
         </div>
       </div>
+
+      {/* Rejection banner */}
+      {isRejected && (
+        <div className="status-decision-banner rejected">
+          <div className="decision-banner-icon">✗</div>
+          <div className="decision-banner-content">
+            <h3>Application Not Approved</h3>
+            <p>
+              We regret to inform you that your application has not been approved in this funding cycle.
+              For more information, please contact us at{' '}
+              <a href="mailto:review@applicheck.org">review@applicheck.org</a>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Approval banner */}
+      {isApproved && (
+        <div className="status-decision-banner approved">
+          <div className="decision-banner-icon">✓</div>
+          <div className="decision-banner-content">
+            <h3>Application Approved!</h3>
+            <p>Congratulations! Your application has been approved. A member of our team will be in touch within 2–3 business days.</p>
+          </div>
+        </div>
+      )}
 
       <div className="status-two-col">
 

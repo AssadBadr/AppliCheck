@@ -89,9 +89,8 @@ export default function CaseworkerDashboard() {
       setApplications(initialData.applications)
       setUsingDemo(true)
     } else {
-      const active = data.filter(r => r.status !== 'approved' && r.status !== 'rejected')
-      setApplications(active.length > 0 ? active.map(rowToApp) : initialData.applications)
-      setUsingDemo(active.length === 0 && data.length === 0)
+      setApplications(data.length > 0 ? data.map(rowToApp) : initialData.applications)
+      setUsingDemo(data.length === 0)
     }
     setLoading(false)
     setLastRefresh(new Date())
@@ -555,8 +554,10 @@ export default function CaseworkerDashboard() {
                 >
                   <div className="app-header">
                     <h3>{app.organizationName}</h3>
-                    <span className={`status-badge ${ready ? 'ready' : 'incomplete'}`}>
-                      {ready
+                    <span className={`status-badge ${app.status === 'rejected' ? 'rejected' : ready ? 'ready' : 'incomplete'}`}>
+                      {app.status === 'rejected'
+                        ? '✗ Not Approved'
+                        : ready
                         ? '✓ Ready for review'
                         : `${counts.missing + counts.mismatch} item${counts.missing + counts.mismatch !== 1 ? 's' : ''} outstanding`
                       }

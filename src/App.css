@@ -231,6 +231,11 @@ header h1 {
   color: white;
 }
 
+.status-badge.rejected {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: white;
+}
+
 .app-meta {
   display: flex;
   flex-direction: column;
