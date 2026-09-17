@@ -56,6 +56,99 @@ export default function ResubmitPortal() {
   // Step 2 — done
   const [done, setDone]                 = useState(false)
 
+  // Validation errors per doc slot
+  const [fileErrors, setFileErrors]     = useState({})
+
+  // ── Smart document validation ─────────────────────────────────────────────
+  // Keywords that identify each document type from its text content
+  const DOC_SIGNATURES = {
+    registration: {
+      required: ['registration', 'incorporation', 'certificate'],
+      forbidden: ['activity plan', 'training activities', 'declaration', 'signoff', 'authorised signatory'],
+    },
+    activity_plan: {
+      required: ['activity', 'plan', 'training'],
+      forbidden: ['certificate of incorporation', 'registration number', 'declaration', 'signatory'],
+    },
+    responsible_person_signoff: {
+      required: ['declaration', 'authorised', 'signatory', 'representative', 'signoff'],
+      forbidden: ['certificate of incorporation', 'registration number', 'activity plan', 'training activities'],
+    },
+  }
+
+  const DOC_LABELS_SHORT = {
+    registration: 'Organisation Registration Document',
+    activity_plan: 'Activity Plan',
+    responsible_person_signoff: 'Authorised Signatory Declaration',
+  }
+
+  const validateDocumentContent = (file, docId) => {
+    return new Promise((resolve) => {
+      // Only validate text-readable files
+      const isText = file.type === 'text/plain' || file.name.endsWith('.txt')
+      if (!isText) {
+        resolve({ valid: true }) // Can't read PDFs in browser — skip deep check
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const content = e.target.result.toLowerCase()
+        const sig = DOC_SIGNATURES[docId]
+        if (!sig) { resolve({ valid: true }); return }
+
+        // Check forbidden keywords — document is clearly the wrong type
+        const foundForbidden = sig.forbidden.find(kw => content.includes(kw))
+        if (foundForbidden) {
+          // Try to identify what the file actually IS
+          let detectedAs = 'a different document type'
+          if (content.includes('certificate of incorporation') || content.includes('registration number')) {
+            detectedAs = 'an Organisation Registration Document'
+          } else if (content.includes('activity plan') || content.includes('training activities')) {
+            detectedAs = 'an Activity Plan'
+          } else if (content.includes('declaration') || content.includes('authorised signatory')) {
+            detectedAs = 'an Authorised Signatory Declaration'
+          }
+          resolve({
+            valid: false,
+            error: `Wrong document detected. This file appears to be ${detectedAs}, but the "${DOC_LABELS_SHORT[docId]}" slot expects a different document. Please upload the correct file.`,
+          })
+          return
+        }
+
+        // Check required keywords — document doesn't look like the right type
+        const hasRequired = sig.required.some(kw => content.includes(kw))
+        if (!hasRequired) {
+          resolve({
+            valid: false,
+            error: `This file does not appear to be a valid "${DOC_LABELS_SHORT[docId]}". Please check you are uploading the correct document.`,
+          })
+          return
+        }
+
+        resolve({ valid: true })
+      }
+      reader.onerror = () => resolve({ valid: true }) // On error, allow upload
+      reader.readAsText(file)
+    })
+  }
+
+  const handleFileChange = async (docId, file) => {
+    if (!file) return
+
+    // Clear previous error for this slot
+    setFileErrors(prev => ({ ...prev, [docId]: null }))
+
+    const result = await validateDocumentContent(file, docId)
+    if (!result.valid) {
+      setFileErrors(prev => ({ ...prev, [docId]: result.error }))
+      // Don't set the file — reject it
+      return
+    }
+
+    setFiles(p => ({ ...p, [docId]: file }))
+  }
+
   // ── Lookup application ────────────────────────────────────────────────────
   const handleLookup = async () => {
     const ref  = refId.trim().toUpperCase()
@@ -287,6 +380,11 @@ ${application.applicant_name}`,
                               ⚠ Caseworker note: <em>{notesField}</em>
                             </div>
                           )}
+                          {fileErrors[doc.id] && (
+                            <div className="resubmit-file-error">
+                              ❌ {fileErrors[doc.id]}
+                            </div>
+                          )}
                           {file && (
                             <div className="file-chip">
                               <span>📄 {file.name}</span>
@@ -308,7 +406,7 @@ ${application.applicant_name}`,
                                 type="file"
                                 accept={doc.accept}
                                 style={{ display: 'none' }}
-                                onChange={e => setFiles(p => ({ ...p, [doc.id]: e.target.files[0] }))}
+                                onChange={e => handleFileChange(doc.id, e.target.files[0])}
                               />
                             </label>
                           ) : (
