@@ -169,6 +169,7 @@ export default function ResubmitPortal() {
     setLookupError(null)
 
     try {
+      // First try Supabase
       const { data, error } = await supabase
         .from('grant_applications')
         .select('*')
@@ -177,9 +178,44 @@ export default function ResubmitPortal() {
 
       if (error) throw error
 
-      const match = data?.find(app =>
+      let match = data?.find(app =>
         app.id.slice(0, 8).toUpperCase() === ref
       )
+
+      // Fallback: check initial.json demo apps
+      if (!match) {
+        const demoApps = (await import('../data/initial.json')).default.applications
+        const demoMatch = demoApps.find(a => {
+          // Match by exact ID or by org name + email
+          const idMatch = a.id.toUpperCase() === ref ||
+                          a.id.replace(/-/g,'').toUpperCase() === ref.replace(/-/g,'')
+          const nameMatch = a.organizationName.toLowerCase().includes(companyName.trim().toLowerCase())
+          const emailMatch = a.contactEmail?.toLowerCase() === email.trim().toLowerCase()
+          return (idMatch || nameMatch) && emailMatch
+        })
+
+        if (demoMatch) {
+          // Map demo format to Supabase format
+          match = {
+            id: demoMatch.id,
+            applicant_name: demoMatch.organizationName,
+            organization_name: demoMatch.organizationName,
+            contact_email: demoMatch.contactEmail,
+            status: demoMatch.status,
+            submitted_at: demoMatch.submittedDate,
+            registration_url: demoMatch.documents?.registration?.submitted ? '#demo' : null,
+            registration_valid: demoMatch.documents?.registration?.valid || false,
+            registration_notes: demoMatch.documents?.registration?.notes || '',
+            activity_plan_url: demoMatch.documents?.activityPlan?.submitted ? '#demo' : null,
+            activity_plan_valid: demoMatch.documents?.activityPlan?.valid || false,
+            activity_plan_notes: demoMatch.documents?.activityPlan?.notes || '',
+            responsible_person_signoff_url: demoMatch.documents?.responsiblePersonSignoff?.submitted ? '#demo' : null,
+            signoff_valid: demoMatch.documents?.responsiblePersonSignoff?.valid || false,
+            signoff_notes: demoMatch.documents?.responsiblePersonSignoff?.notes || '',
+            _isDemo: true, // flag so we skip Supabase update
+          }
+        }
+      }
 
       if (!match) {
         setLookupError('No application found. Please check your reference ID, organisation name and email.')
@@ -295,12 +331,15 @@ export default function ResubmitPortal() {
 
       const newStatus = allDocsValid ? 'review_ready' : 'under_review'
 
-      const { error: updateError } = await supabase
-        .from('grant_applications')
-        .update({ ...patch, status: newStatus })
-        .eq('id', application.id)
+      // Skip Supabase update for demo apps (they only exist in initial.json)
+      if (!application._isDemo) {
+        const { error: updateError } = await supabase
+          .from('grant_applications')
+          .update({ ...patch, status: newStatus })
+          .eq('id', application.id)
 
-      if (updateError) throw updateError
+        if (updateError) throw updateError
+      }
 
       // Send notification to foundation inbox
       const invalidDocs = REQUIRED_DOCS.filter(doc => files[doc.id] && patch[doc.validCol] === false)
@@ -519,14 +558,14 @@ export default function ResubmitPortal() {
               <label>Reference ID <span className="required">*</span></label>
               <input
                 type="text"
-                placeholder="e.g. FF50A565"
+                placeholder="e.g. APP-002 or FF50A565"
                 value={refId}
                 onChange={e => setRefId(e.target.value.toUpperCase())}
-                maxLength={8}
+                maxLength={20}
                 autoFocus
                 style={{ textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700 }}
               />
-              <span className="form-hint">8-character code from your confirmation message</span>
+              <span className="form-hint">Found in your confirmation message or inbox</span>
             </div>
 
             <div className="form-group">
