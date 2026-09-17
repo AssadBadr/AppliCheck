@@ -153,7 +153,7 @@ export default function FoundationInbox({ onClose }) {
         .insert({
           application_id: selectedApp,
           sender_type: 'foundation',
-          sender_name: 'Schmitz-Stiftungen',
+          sender_name: 'AppliCheck',
           subject: subject,
           body: body,
           read: false

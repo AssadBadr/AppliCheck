@@ -6,10 +6,13 @@ import '../styles/portal.css'
 const REQUIRED_DOCS = [
   {
     id: 'registration',
-    label: 'Organization Registration Document',
+    label: 'Organisation Registration Document',
     description: 'Official document proving your legal registration status',
     accept: '.pdf,.doc,.docx,.jpg,.png',
     icon: '🏛️',
+    urlCol:   'registration_url',
+    validCol: 'registration_valid',
+    notesCol: 'registration_notes',
   },
   {
     id: 'activity_plan',
@@ -17,17 +20,45 @@ const REQUIRED_DOCS = [
     description: 'Detailed plan of your training activities and expected outcomes',
     accept: '.pdf,.doc,.docx',
     icon: '📋',
+    urlCol:   'activity_plan_url',
+    validCol: 'activity_plan_valid',
+    notesCol: 'activity_plan_notes',
   },
   {
     id: 'responsible_person_signoff',
-    label: 'Responsible Person Signoff',
-    description: 'Signed declaration from an authorized representative',
+    label: 'Authorised Signatory Declaration',
+    description: 'Signed declaration from an authorised representative',
     accept: '.pdf,.doc,.docx,.jpg,.png',
     icon: '✍️',
+    urlCol:   'responsible_person_signoff_url',
+    validCol: 'signoff_valid',
+    notesCol: 'signoff_notes',
   },
 ]
 
 const STEPS = ['Organisation', 'Documents', 'Review & Submit']
+
+// Keywords for document type detection (text files only)
+const DOC_SIGNATURES = {
+  registration: {
+    required: ['registration', 'incorporation', 'certificate'],
+    forbidden: ['activity plan', 'training activities', 'declaration', 'signoff', 'authorised signatory'],
+  },
+  activity_plan: {
+    required: ['activity', 'plan', 'training'],
+    forbidden: ['certificate of incorporation', 'registration number', 'declaration', 'signatory'],
+  },
+  responsible_person_signoff: {
+    required: ['declaration', 'authorised', 'signatory', 'representative', 'signoff'],
+    forbidden: ['certificate of incorporation', 'registration number', 'activity plan', 'training activities'],
+  },
+}
+
+const DOC_TYPE_LABELS = {
+  registration: 'Organisation Registration Document',
+  activity_plan: 'Activity Plan',
+  responsible_person_signoff: 'Authorised Signatory Declaration',
+}
 
 export default function ApplicantPortal() {
   const navigate = useNavigate()
@@ -44,12 +75,85 @@ export default function ApplicantPortal() {
   const [contactEmail, setContactEmail] = useState('')
 
   // duplicate-application state
-  const [duplicateApp, setDuplicateApp] = useState(null) // 'approved' | 'resubmit'
+  const [duplicateApp, setDuplicateApp] = useState(null)
   const [existingApp, setExistingApp]   = useState(null)
   const [uploadProgress, setUploadProgress] = useState({})
   const [files, setFiles] = useState({ registration: null, activity_plan: null, responsible_person_signoff: null })
   const [validating, setValidating] = useState({})
   const [fileErrors, setFileErrors] = useState({})
+
+  // ── Document type validation (upload-time, text files only) ──────────────
+  const validateDocumentType = async (file, expectedType) => {
+    const isText = file.type === 'text/plain' || file.name.endsWith('.txt')
+    if (!isText) {
+      // PDFs/images: can't read content in browser — accept them
+      return { isValid: true }
+    }
+
+    try {
+      const text = await file.text()
+      const content = text.toLowerCase()
+      const sig = DOC_SIGNATURES[expectedType]
+      if (!sig) return { isValid: true }
+
+      // Reject if file contains keywords from a different doc type
+      const foundForbidden = sig.forbidden.find(kw => content.includes(kw))
+      if (foundForbidden) {
+        let detectedAs = 'a different document type'
+        if (content.includes('certificate of incorporation') || content.includes('registration number')) {
+          detectedAs = 'an Organisation Registration Document'
+        } else if (content.includes('activity plan') || content.includes('training activities')) {
+          detectedAs = 'an Activity Plan'
+        } else if (content.includes('declaration') || content.includes('authorised signatory')) {
+          detectedAs = 'an Authorised Signatory Declaration'
+        }
+        return {
+          isValid: false,
+          message: `Wrong document detected. This file appears to be ${detectedAs}, but the "${DOC_TYPE_LABELS[expectedType]}" slot expects a different document.`,
+        }
+      }
+
+      // Warn if required keywords missing
+      const hasRequired = sig.required.some(kw => content.includes(kw))
+      if (!hasRequired) {
+        return {
+          isValid: false,
+          message: `This file does not appear to be a valid "${DOC_TYPE_LABELS[expectedType]}". Please check you are uploading the correct document.`,
+        }
+      }
+
+      return { isValid: true }
+    } catch {
+      return { isValid: true } // On read error, allow the upload
+    }
+  }
+
+  // ── Auto-validate for Supabase columns (returns { valid, notes }) ─────────
+  const autoValidateFile = async (file, docId) => {
+    const isText = file.type === 'text/plain' || file.name.endsWith('.txt')
+    if (!isText) {
+      // PDFs/images pass automatically — caseworker reviews if needed
+      return { valid: true, notes: '' }
+    }
+    try {
+      const text = await file.text()
+      const content = text.toLowerCase()
+      const sig = DOC_SIGNATURES[docId]
+      if (!sig) return { valid: true, notes: '' }
+
+      const foundForbidden = sig.forbidden.find(kw => content.includes(kw))
+      if (foundForbidden) {
+        return { valid: false, notes: `Wrong document type detected — "${foundForbidden}" found in document` }
+      }
+      const hasRequired = sig.required.some(kw => content.includes(kw))
+      if (!hasRequired) {
+        return { valid: false, notes: 'Document content does not match expected type' }
+      }
+      return { valid: true, notes: '' }
+    } catch {
+      return { valid: true, notes: '' }
+    }
+  }
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const handleFileChange = async (docId, file) => {
@@ -63,215 +167,63 @@ export default function ApplicantPortal() {
     setFileErrors(prev => ({ ...prev, [docId]: null }))
 
     try {
-      // Smart document validation - detect if wrong file type uploaded
       const validation = await validateDocumentType(file, docId)
       if (!validation.isValid) {
         setFileErrors(prev => ({ ...prev, [docId]: validation.message }))
         setValidating(prev => ({ ...prev, [docId]: false }))
         return
       }
-
       setFileErrors(prev => ({ ...prev, [docId]: null }))
       setFiles(prev => ({ ...prev, [docId]: file }))
-    } catch (err) {
+    } catch {
       setFileErrors(prev => ({ ...prev, [docId]: 'Error validating document. Please try again.' }))
     } finally {
       setValidating(prev => ({ ...prev, [docId]: false }))
     }
   }
 
-  // AI-powered document type detection using OCR/text analysis
-  const validateDocumentType = async (file, expectedType) => {
-    // Simulate OCR processing delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    try {
-      // In production: Use OCR API (Tesseract.js, Google Vision API, etc.)
-      // For demo: Simulate reading document headers and company data
-      const documentText = await simulateOCR(file)
-      
-      // Define document type signatures based on headers/content
-      const documentTypes = {
-        registration: {
-          headers: ['CERTIFICATE OF INCORPORATION', 'COMPANY REGISTRATION', 'ORGANIZATION REGISTRATION', 'LEGAL REGISTRATION', 'BUSINESS REGISTRATION'],
-          requiredFields: ['company name', 'registration number', 'incorporation date', 'registered office']
-        },
-        activity_plan: {
-          headers: ['ACTIVITY PLAN', 'TRAINING PLAN', 'PROJECT PLAN', 'PROGRAM ACTIVITIES', 'CURRICULUM PLAN'],
-          requiredFields: ['activities', 'timeline', 'objectives', 'expected outcomes', 'training schedule']
-        },
-        responsible_person_signoff: {
-          headers: ['DECLARATION', 'AUTHORIZATION LETTER', 'SIGNATORY DECLARATION', 'RESPONSIBLE PERSON', 'AUTHORIZED REPRESENTATIVE'],
-          requiredFields: ['signature', 'signatory name', 'title', 'date signed', 'authorization']
-        }
-      }
-
-      // Check if document matches expected type
-      const expectedDoc = documentTypes[expectedType]
-      const hasCorrectHeader = expectedDoc.headers.some(header => 
-        documentText.toUpperCase().includes(header)
-      )
-      
-      if (!hasCorrectHeader) {
-        // Check if it matches a different document type
-        for (const [docType, docSpec] of Object.entries(documentTypes)) {
-          if (docType !== expectedType) {
-            const matchesOtherType = docSpec.headers.some(header => 
-              documentText.toUpperCase().includes(header)
-            )
-            if (matchesOtherType) {
-              const docTypeLabels = {
-                registration: 'Organization Registration Document',
-                activity_plan: 'Activity Plan',
-                responsible_person_signoff: 'Responsible Person Signoff'
-              }
-              
-              return {
-                isValid: false,
-                message: `Document mismatch detected. This appears to be a "${docTypeLabels[docType]}" but you're uploading it as "${docTypeLabels[expectedType]}". Please upload the correct document type.`
-              }
-            }
-          }
-        }
-        
-        // If no clear type detected, show generic error
-        const docTypeLabels = {
-          registration: 'Organization Registration Document',
-          activity_plan: 'Activity Plan', 
-          responsible_person_signoff: 'Responsible Person Signoff'
-        }
-        
-        return {
-          isValid: false,
-          message: `Document type unclear. Expected "${docTypeLabels[expectedType]}" with header containing one of: ${expectedDoc.headers.slice(0,2).join(' or ')}. Please check your document.`
-        }
-      }
-
-      // Validate company name consistency (if organization name is filled)
-      if (organizationName.trim() && !documentText.toUpperCase().includes(organizationName.trim().toUpperCase())) {
-        return {
-          isValid: false,
-          message: `Company name mismatch. Document should contain "${organizationName}" but we found different company information. Please ensure the document belongs to your organization.`
-        }
-      }
-
-      return { isValid: true }
-      
-    } catch (error) {
-      return {
-        isValid: false,
-        message: 'Could not read document. Please ensure it\'s a clear, text-readable PDF or image file.'
-      }
-    }
-  }
-
-  // Simulate OCR text extraction (in production: use real OCR API)
-  const simulateOCR = async (file) => {
-    // For demo: Read file content if it's a text file, otherwise mock based on filename
-    try {
-      if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
-        // Read actual file content for text files
-        const text = await file.text()
-        return text
-      } else {
-        // For PDF/images, mock OCR based on filename patterns
-        const filename = file.name.toLowerCase()
-        
-        if (filename.includes('registration') || filename.includes('certificate')) {
-          return `CERTIFICATE OF INCORPORATION
-          
-Company Name: ${organizationName || 'Example Corp Ltd'}
-Registration Number: RC123456
-Incorporation Date: January 15, 2020
-Registered Office: 123 Business Street, Casablanca
-Legal Status: Private Limited Company`
-        }
-        
-        if (filename.includes('activity') || filename.includes('plan')) {
-          return `TRAINING ACTIVITY PLAN
-          
-Organization: ${organizationName || 'Example Corp Ltd'}
-Project Title: Digital Skills Training Program
-Duration: 6 months
-Activities:
-- Web development training
-- Digital marketing workshops
-- Certification programs
-Expected Outcomes: 50 trained participants`
-        }
-        
-        if (filename.includes('signoff') || filename.includes('declaration')) {
-          return `DECLARATION OF AUTHORIZED REPRESENTATIVE
-          
-Organization: ${organizationName || 'Example Corp Ltd'}
-I, John Smith, as Director of ${organizationName || 'Example Corp Ltd'}, 
-hereby declare and authorize this application.
-Signature: [Signed]
-Date: ${new Date().toLocaleDateString()}
-Title: Managing Director`
-        }
-        
-        // Default mock for unclear files
-        return `SAMPLE DOCUMENT
-Generic content without clear document type indicators.
-Organization mentioned: ${organizationName || 'Unknown Company'}
-This document format is unclear.`
-      }
-    } catch (error) {
-      throw new Error('Could not read document content')
-    }
-  }
-
   const uploadFile = async (docId, file) => {
     if (!file) return null
-    
     const ext = file.name.split('.').pop()
     const path = `${Date.now()}_${docId}.${ext}`
     setUploadProgress(p => ({ ...p, [docId]: 'uploading' }))
-    
     try {
       const { error } = await supabase.storage
         .from('grant-documents')
         .upload(path, file, { upsert: true })
-      
       if (error) throw new Error(`Upload failed for ${docId}: ${error.message}`)
-      
       const { data: { publicUrl } } = supabase.storage
         .from('grant-documents')
         .getPublicUrl(path)
-      
       setUploadProgress(p => ({ ...p, [docId]: 'done' }))
       return publicUrl
-    } catch (error) {
+    } catch (err) {
       setUploadProgress(p => ({ ...p, [docId]: 'error' }))
-      throw error
+      throw err
     }
   }
 
   const handleSubmit = async () => {
-    // Validation
     if (!applicantName.trim() || !organizationName.trim() || !contactEmail.trim()) {
       setError('Please fill in all required fields')
       return
     }
-    
     if (!contactEmail.includes('@') || !contactEmail.includes('.')) {
       setError('Please enter a valid email address')
       return
     }
-    
     if (applicantName.trim().length < 2) {
       setError('Applicant name must be at least 2 characters')
       return
     }
-    
     if (organizationName.trim().length < 2) {
-      setError('Organization name must be at least 2 characters')
+      setError('Organisation name must be at least 2 characters')
       return
     }
-    
+
     setSubmitting(true)
     setError(null)
+
     try {
       // ── Duplicate check ──────────────────────────────────────────────────
       const { data: existing } = await supabase
@@ -286,79 +238,94 @@ This document format is unclear.`
       if (existing) {
         setSubmitting(false)
         if (existing.status === 'approved') {
-          // Block — already approved
           setExistingApp(existing)
           setDuplicateApp('approved')
           return
         } else {
-          // under_review or rejected — treat as resubmission
           setExistingApp(existing)
           setDuplicateApp('resubmit')
           return
         }
       }
-      // ── End duplicate check ───────────────────────────────────────────────
 
-      // Upload files that were provided
-      const urls = {}
+      // ── Upload files & auto-validate ─────────────────────────────────────
+      const urls   = {}
+      const valids = {}
+      const notes  = {}
+
       for (const doc of REQUIRED_DOCS) {
         if (files[doc.id]) {
-          urls[doc.id] = await uploadFile(doc.id, files[doc.id])
+          urls[doc.id]   = await uploadFile(doc.id, files[doc.id])
+          const result   = await autoValidateFile(files[doc.id], doc.id)
+          valids[doc.id] = result.valid
+          notes[doc.id]  = result.notes
+        } else {
+          valids[doc.id] = false
+          notes[doc.id]  = 'Document not provided'
         }
       }
 
-      // Insert row into Supabase
+      // ── Insert row with validation state already set ─────────────────────
       const { data, error: insertError } = await supabase
         .from('grant_applications')
         .insert({
-          applicant_name: applicantName.trim(),
+          applicant_name:    applicantName.trim(),
           organization_name: organizationName.trim(),
-          contact_email: contactEmail.trim(),
-          registration_url: urls.registration || null,
-          activity_plan_url: urls.activity_plan || null,
+          contact_email:     contactEmail.trim(),
+          // URLs
+          registration_url:               urls.registration               || null,
+          activity_plan_url:              urls.activity_plan              || null,
           responsible_person_signoff_url: urls.responsible_person_signoff || null,
+          // Validation — set immediately so status page is accurate
+          registration_valid:   valids.registration,
+          registration_notes:   notes.registration,
+          activity_plan_valid:  valids.activity_plan,
+          activity_plan_notes:  notes.activity_plan,
+          signoff_valid:        valids.responsible_person_signoff,
+          signoff_notes:        notes.responsible_person_signoff,
+          // Status
           status: 'under_review',
         })
         .select('id')
         .single()
 
       if (insertError) throw new Error(insertError.message)
-      
-      // Generate reference ID for the welcome message
+
       const refId = data.id.slice(0, 8).toUpperCase()
-      
-      // Send automatic welcome message
-      const welcomeMessage = {
+
+      // ── Send welcome message ─────────────────────────────────────────────
+      const allValid = Object.values(valids).every(v => v)
+      const missingDocs = REQUIRED_DOCS.filter(d => !files[d.id])
+      const invalidDocs = REQUIRED_DOCS.filter(d => files[d.id] && !valids[d.id])
+
+      let welcomeBody = `Dear ${applicantName.trim()},\n\nThank you for submitting your grant application. We have received your application and assigned it reference number #${refId}.\n\n`
+
+      if (allValid) {
+        welcomeBody += `AppliCheck has automatically verified all your documents. Your application is ready for caseworker review.\n\n`
+      } else {
+        if (missingDocs.length > 0) {
+          welcomeBody += `The following documents were not submitted:\n${missingDocs.map(d => `• ${d.label}`).join('\n')}\n\n`
+        }
+        if (invalidDocs.length > 0) {
+          welcomeBody += `The following documents need attention:\n${invalidDocs.map(d => `• ${d.label}: ${notes[d.id]}`).join('\n')}\n\n`
+        }
+        welcomeBody += `Please use the Resubmit portal to upload the corrected documents.\n\n`
+      }
+
+      welcomeBody += `What happens next:\n• Automated document check — immediate\n• Caseworker review — within 24 hours\n• Final decision notification\n\nKind regards,\nAppliCheck`
+
+      const { error: msgError } = await supabase.from('messages').insert({
         application_id: data.id,
-        sender_type: 'foundation',
-        sender_name: 'Schmitz-Stiftungen',
-        subject: `Application Received - Reference #${refId}`,
-        body: `Dear ${applicantName.trim()},
+        sender_type:    'foundation',
+        sender_name:    'AppliCheck',
+        subject:        allValid
+          ? `✅ Application Received — Reference #${refId}`
+          : `📋 Application Received — Action Required — Reference #${refId}`,
+        body: welcomeBody,
+        read: false,
+      })
+      if (msgError) console.error('Failed to send welcome message:', msgError)
 
-Thank you for submitting your grant application. We have received your application and assigned it reference number #${refId}.
-
-AppliCheck has automatically scanned your documents. If anything is missing or needs correction, you will receive a precise request here in your inbox — usually within minutes.
-
-What happens next:
-• Automated document check — immediate
-• Caseworker review — within 24 hours
-• Final decision notification
-
-You can track your application status and receive updates through your inbox.
-
-If you have any questions, feel free to send us a message through the inbox.
-
-Best regards,
-The Foundation Team`,
-        read: false
-      }
-      
-      const { error: msgError } = await supabase.from('messages').insert(welcomeMessage)
-      if (msgError) {
-        console.error('Failed to send welcome message:', msgError)
-        // Don't fail the whole submission if message fails
-      }
-      
       setSubmittedId(data.id)
       setSubmitted(true)
     } catch (err) {
@@ -423,16 +390,10 @@ The Foundation Team`,
             You cannot submit a duplicate application. If you have a question, please contact the foundation directly.
           </p>
           <div className="success-actions" style={{ marginTop: '2rem' }}>
-            <button
-              className="btn-primary"
-              onClick={() => navigate(`/inbox/${existingApp.id}`)}
-            >
+            <button className="btn-primary" onClick={() => navigate(`/inbox/${existingApp.id}`)}>
               📧 Open My Inbox
             </button>
-            <button
-              className="btn-secondary"
-              onClick={() => navigate(`/status/${existingApp.id}`)}
-            >
+            <button className="btn-secondary" onClick={() => navigate(`/status/${existingApp.id}`)}>
               📊 View Application Status
             </button>
           </div>
@@ -459,25 +420,13 @@ The Foundation Team`,
             <strong>{existingApp?.id?.slice(0, 8).toUpperCase()}</strong>
           </div>
           <div className="success-actions">
-            <button
-              className="btn-primary"
-              onClick={() => navigate('/resubmit')}
-            >
+            <button className="btn-primary" onClick={() => navigate('/resubmit')}>
               📤 Resubmit Documents
             </button>
-            <button
-              className="btn-secondary"
-              onClick={() => navigate(`/inbox/${existingApp.id}`)}
-            >
+            <button className="btn-secondary" onClick={() => navigate(`/inbox/${existingApp.id}`)}>
               📧 Open My Inbox
             </button>
-            <button
-              className="btn-secondary"
-              onClick={() => {
-                setDuplicateApp(null)
-                setExistingApp(null)
-              }}
-            >
+            <button className="btn-secondary" onClick={() => { setDuplicateApp(null); setExistingApp(null) }}>
               Submit as New Application Anyway
             </button>
           </div>
@@ -571,34 +520,33 @@ The Foundation Team`,
             <h2>Upload Required Documents</h2>
             <p className="step-desc">
               All three documents are required for your application to reach review-ready status.
-              Missing documents will be flagged by the caseworker.
+              Missing documents will be flagged automatically.
             </p>
 
             <div className="doc-upload-list">
               {REQUIRED_DOCS.map(doc => {
                 const file = files[doc.id]
-                const progress = uploadProgress[doc.id]
                 return (
                   <div key={doc.id} className={`doc-upload-item ${file ? 'has-file' : ''}`}>
                     <div className="doc-upload-icon">{doc.icon}</div>
                     <div className="doc-upload-info">
                       <h4>{doc.label}</h4>
                       <p>{doc.description}</p>
+                      {fileErrors[doc.id] && (
+                        <div className="resubmit-file-error">❌ {fileErrors[doc.id]}</div>
+                      )}
                       {file && (
                         <div className="file-chip">
                           <span>📄 {file.name}</span>
-                          <button
-                            className="remove-file"
-                            onClick={() => handleFileChange(doc.id, null)}
-                          >✕</button>
+                          <button className="remove-file" onClick={() => handleFileChange(doc.id, null)}>✕</button>
                         </div>
                       )}
                     </div>
                     <div className="doc-upload-action">
                       {validating[doc.id] ? (
                         <div className="validating-state">
-                          <div className="validation-spinner"></div>
-                          <span>Validating...</span>
+                          <div className="validation-spinner" />
+                          <span>Checking…</span>
                         </div>
                       ) : !file ? (
                         <label className="upload-btn">
@@ -613,7 +561,7 @@ The Foundation Team`,
                       ) : (
                         <div className="upload-success">
                           <span className="validation-check">✓</span>
-                          <span>Validated</span>
+                          <span>Ready</span>
                         </div>
                       )}
                     </div>
@@ -622,14 +570,14 @@ The Foundation Team`,
               })}
             </div>
 
-            <div className="missing-warning">
-              {REQUIRED_DOCS.filter(d => !files[d.id]).length > 0 && (
+            {REQUIRED_DOCS.filter(d => !files[d.id]).length > 0 && (
+              <div className="missing-warning">
                 <p>
-                  ⚠️ {REQUIRED_DOCS.filter(d => !files[d.id]).length} document(s) missing.
-                  Your application can still be submitted, but will be flagged as incomplete.
+                  ⚠️ {REQUIRED_DOCS.filter(d => !files[d.id]).length} document(s) not yet uploaded.
+                  You can still submit — missing items will be flagged for follow-up.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="step-actions">
               <button className="btn-secondary" onClick={() => setStep(0)}>← Back</button>
@@ -696,11 +644,7 @@ The Foundation Team`,
                 disabled={submitting}
                 onClick={handleSubmit}
               >
-                {submitting ? (
-                  <span className="spinner-text">⏳ Uploading & Submitting…</span>
-                ) : (
-                  'Submit Application'
-                )}
+                {submitting ? '⏳ Uploading & Submitting…' : 'Submit Application'}
               </button>
             </div>
           </div>

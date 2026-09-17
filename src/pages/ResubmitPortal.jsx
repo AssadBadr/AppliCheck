@@ -40,7 +40,6 @@ export default function ResubmitPortal() {
   const navigate = useNavigate()
 
   // Step 0 — lookup
-  const [refId, setRefId]               = useState('')
   const [companyName, setCompanyName]   = useState('')
   const [email, setEmail]               = useState('')
   const [looking, setLooking]           = useState(false)
@@ -151,12 +150,11 @@ export default function ResubmitPortal() {
 
   // ── Lookup application ────────────────────────────────────────────────────
   const handleLookup = async () => {
-    const ref  = refId.trim().toUpperCase()
-    const name = companyName.trim().toLowerCase()
+    const name = companyName.trim()
     const mail = email.trim().toLowerCase()
 
-    if (!ref || !name || !mail) {
-      setLookupError('Please fill in all three fields.')
+    if (!name || !mail) {
+      setLookupError('Please fill in both fields.')
       return
     }
 
@@ -169,33 +167,27 @@ export default function ResubmitPortal() {
     setLookupError(null)
 
     try {
-      // First try Supabase
+      // First try Supabase — match on org name + email
       const { data, error } = await supabase
         .from('grant_applications')
         .select('*')
-        .ilike('organization_name', `%${companyName.trim()}%`)
-        .ilike('contact_email', `%${email.trim()}%`)
+        .ilike('organization_name', `%${name}%`)
+        .ilike('contact_email', `%${mail}%`)
 
       if (error) throw error
 
-      let match = data?.find(app =>
-        app.id.slice(0, 8).toUpperCase() === ref
-      )
+      let match = data?.[0] ?? null
 
       // Fallback: check initial.json demo apps
       if (!match) {
         const demoApps = (await import('../data/initial.json')).default.applications
         const demoMatch = demoApps.find(a => {
-          // Match by exact ID or by org name + email
-          const idMatch = a.id.toUpperCase() === ref ||
-                          a.id.replace(/-/g,'').toUpperCase() === ref.replace(/-/g,'')
-          const nameMatch = a.organizationName.toLowerCase().includes(companyName.trim().toLowerCase())
-          const emailMatch = a.contactEmail?.toLowerCase() === email.trim().toLowerCase()
-          return (idMatch || nameMatch) && emailMatch
+          const nameMatch  = a.organizationName.toLowerCase().includes(name.toLowerCase())
+          const emailMatch = a.contactEmail?.toLowerCase() === mail
+          return nameMatch && emailMatch
         })
 
         if (demoMatch) {
-          // Map demo format to Supabase format
           match = {
             id: demoMatch.id,
             applicant_name: demoMatch.organizationName,
@@ -212,7 +204,7 @@ export default function ResubmitPortal() {
             responsible_person_signoff_url: demoMatch.documents?.responsiblePersonSignoff?.submitted ? '#demo' : null,
             signoff_valid: demoMatch.documents?.responsiblePersonSignoff?.valid || false,
             signoff_notes: demoMatch.documents?.responsiblePersonSignoff?.notes || '',
-            _isDemo: true, // flag so we skip Supabase update
+            _isDemo: true,
           }
         }
       }
@@ -310,9 +302,10 @@ export default function ResubmitPortal() {
 
       for (const doc of REQUIRED_DOCS) {
         if (files[doc.id]) {
-          const url = await uploadFile(doc.id, files[doc.id])
-          // Auto-validate the file — no manual caseworker action needed
+          // Auto-validate the file content regardless of demo/real
           const validation = await autoValidateFile(files[doc.id], doc.id)
+          // Only upload to storage for real apps (demo apps have no Supabase row)
+          const url = application._isDemo ? '#demo-resubmit' : await uploadFile(doc.id, files[doc.id])
           patch[doc.urlCol]   = url
           patch[doc.validCol] = validation.valid   // ✅ AUTO-SET based on content
           patch[doc.notesCol] = validation.valid ? '' : validation.notes
@@ -339,24 +332,25 @@ export default function ResubmitPortal() {
           .eq('id', application.id)
 
         if (updateError) throw updateError
+
+        // Send notification to foundation inbox (only for real apps — demo apps
+        // have no UUID in grant_applications, so the FK constraint would fail)
+        const invalidDocs = REQUIRED_DOCS.filter(doc => files[doc.id] && patch[doc.validCol] === false)
+        const validDocs   = REQUIRED_DOCS.filter(doc => files[doc.id] && patch[doc.validCol] === true)
+
+        await supabase.from('messages').insert({
+          application_id: application.id,
+          sender_type:    'foundation',
+          sender_name:    'AppliCheck',
+          subject:        allDocsValid
+            ? `✅ Documents Verified — Ref #${application.id.slice(0, 8).toUpperCase()}`
+            : `⚠ Resubmission Review — Ref #${application.id.slice(0, 8).toUpperCase()}`,
+          body: allDocsValid
+            ? `Dear ${application.applicant_name},\n\nAppliCheck has automatically verified your resubmitted documents for application Ref #${application.id.slice(0, 8).toUpperCase()}.\n\nAll required documents are now valid. Your application is ready for final review by our programme committee.\n\nKind regards,\nAppliCheck`
+            : `Dear ${application.applicant_name},\n\nAppliCheck reviewed your resubmitted documents for Ref #${application.id.slice(0, 8).toUpperCase()}.\n\n${validDocs.length > 0 ? `✅ Accepted:\n${validDocs.map(d => `• ${d.label}`).join('\n')}\n\n` : ''}${invalidDocs.length > 0 ? `❌ Still requires correction:\n${invalidDocs.map(d => `• ${d.label}: ${patch[d.notesCol]}`).join('\n')}\n\n` : ''}Please correct the remaining items and resubmit.\n\nKind regards,\nAppliCheck`,
+          read: false,
+        })
       }
-
-      // Send notification to foundation inbox
-      const invalidDocs = REQUIRED_DOCS.filter(doc => files[doc.id] && patch[doc.validCol] === false)
-      const validDocs   = REQUIRED_DOCS.filter(doc => files[doc.id] && patch[doc.validCol] === true)
-
-      await supabase.from('messages').insert({
-        application_id: application.id,
-        sender_type:    'foundation',
-        sender_name:    'Schmitz-Stiftungen',
-        subject:        allDocsValid
-          ? `✅ Documents Verified — Ref #${application.id.slice(0, 8).toUpperCase()}`
-          : `⚠ Resubmission Review — Ref #${application.id.slice(0, 8).toUpperCase()}`,
-        body: allDocsValid
-          ? `Dear ${application.applicant_name},\n\nAppliCheck has automatically verified your resubmitted documents for application Ref #${application.id.slice(0, 8).toUpperCase()}.\n\nAll required documents are now valid. Your application is ready for final review by our programme committee.\n\nKind regards,\nSchmitz-Stiftungen`
-          : `Dear ${application.applicant_name},\n\nAppliCheck reviewed your resubmitted documents for Ref #${application.id.slice(0, 8).toUpperCase()}.\n\n${validDocs.length > 0 ? `✅ Accepted:\n${validDocs.map(d => `• ${d.label}`).join('\n')}\n\n` : ''}${invalidDocs.length > 0 ? `❌ Still requires correction:\n${invalidDocs.map(d => `• ${d.label}: ${patch[d.notesCol]}`).join('\n')}\n\n` : ''}Please correct the remaining items and resubmit.\n\nKind regards,\nSchmitz-Stiftungen`,
-        read: false,
-      })
 
       setDone(true)
     } catch (err) {
@@ -541,7 +535,7 @@ export default function ResubmitPortal() {
       <div className="portal-header">
         <div className="portal-header-left">
           <h1>Resubmit Documents</h1>
-          <p>Enter your reference ID and organisation name to continue</p>
+          <p>Enter your organisation name and email to continue</p>
         </div>
         <div className="portal-badge">Resubmission</div>
       </div>
@@ -550,24 +544,10 @@ export default function ResubmitPortal() {
         <div className="portal-step">
           <h2>Find Your Application</h2>
           <p className="step-desc">
-            You can find your reference ID in the confirmation email or your inbox.
+            Use the organisation name and email address from your original application.
           </p>
 
           <div className="form-grid">
-            <div className="form-group">
-              <label>Reference ID <span className="required">*</span></label>
-              <input
-                type="text"
-                placeholder="e.g. APP-002 or FF50A565"
-                value={refId}
-                onChange={e => setRefId(e.target.value.toUpperCase())}
-                maxLength={20}
-                autoFocus
-                style={{ textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700 }}
-              />
-              <span className="form-hint">Found in your confirmation message or inbox</span>
-            </div>
-
             <div className="form-group">
               <label>Organisation Name <span className="required">*</span></label>
               <input
@@ -575,11 +555,12 @@ export default function ResubmitPortal() {
                 placeholder="e.g. Community Workshop B"
                 value={companyName}
                 onChange={e => setCompanyName(e.target.value)}
+                autoFocus
               />
               <span className="form-hint">Must match the name on your original application</span>
             </div>
 
-            <div className="form-group full">
+            <div className="form-group">
               <label>Contact Email <span className="required">*</span></label>
               <input
                 type="email"
@@ -602,7 +583,7 @@ export default function ResubmitPortal() {
             <button
               className="btn-primary"
               onClick={handleLookup}
-              disabled={looking || !refId.trim() || !companyName.trim() || !email.trim()}
+              disabled={looking || !companyName.trim() || !email.trim()}
             >
               {looking ? '🔍 Looking up…' : 'Find My Application →'}
             </button>

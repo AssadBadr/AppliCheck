@@ -62,6 +62,9 @@ export default function CaseworkerDashboard() {
   // Track simulated resubmission
   const [simulating, setSimulating]         = useState(false)
   const [simulateDone, setSimulateDone]     = useState(false)
+  // Email preview / sent state
+  const [showEmailPreview, setShowEmailPreview] = useState(false)
+  const [emailSent, setEmailSent]               = useState(false)
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchApplications = useCallback(async () => {
@@ -214,7 +217,7 @@ export default function CaseworkerDashboard() {
         const { error } = await supabase.from('messages').insert({
           application_id: selectedApp.fullId,
           sender_type:    'foundation',
-          sender_name:    'Schmitz-Stiftungen',
+          sender_name:    'AppliCheck',
           subject:        draft.subject,
           body:           draft.body,
           read:           false,
@@ -332,7 +335,7 @@ export default function CaseworkerDashboard() {
         const { error: msgError } = await supabase.from('messages').insert({
           application_id: selectedApp.fullId,
           sender_type:    'foundation',
-          sender_name:    'Schmitz-Stiftungen',
+          sender_name:    'AppliCheck',
           subject:        `Application Approved — Ref ${selectedApp.id}`,
           body: `Dear ${selectedApp.applicantName},\n\nYour grant application (Ref: ${selectedApp.id}) has been approved by the programme review committee.\n\nA member of our team will be in touch within 2–3 business days to discuss next steps.\n\nKind regards,\nProgramme Review Team`,
           read: false,
@@ -360,7 +363,7 @@ export default function CaseworkerDashboard() {
         const { error: msgError } = await supabase.from('messages').insert({
           application_id: selectedApp.fullId,
           sender_type:    'foundation',
-          sender_name:    'Schmitz-Stiftungen',
+          sender_name:    'AppliCheck',
           subject:        `Application Outcome — Ref ${selectedApp.id}`,
           body: `Dear ${selectedApp.applicantName},\n\nThank you for submitting your application (Ref: ${selectedApp.id}).\n\nAfter careful review by our committee, we regret to inform you that your application has not been selected for funding in this cycle.\n\nWe encourage you to consider reapplying in the next funding round. Please don't hesitate to contact us if you have any questions.\n\nKind regards,\nProgramme Review Team`,
           read: false,
@@ -469,7 +472,7 @@ export default function CaseworkerDashboard() {
       <header>
         <div>
           <div className="header-brand">
-            <h1>Schmitz-Stiftungen</h1>
+            <h1>AppliCheck</h1>
             <span className="gmail-badge">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="white" strokeWidth="2" fill="none"/>
@@ -478,7 +481,7 @@ export default function CaseworkerDashboard() {
             </span>
           </div>
           <p className="subtitle">
-            Grant Review Dashboard · Document Verification
+            AppliCheck · Grant Review Dashboard
           </p>
         </div>
         <div className="header-actions">

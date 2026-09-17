@@ -4,9 +4,9 @@ import { supabase } from '../lib/supabase'
 import '../styles/status.css'
 
 const DOC_LABELS = {
-  registration:              'Organization Registration Document',
+  registration:              'Organisation Registration Document',
   activity_plan:             'Activity Plan',
-  responsible_person_signoff: 'Responsible Person Signoff',
+  responsible_person_signoff: 'Authorised Signatory Declaration',
 }
 
 export default function ApplicantStatus() {

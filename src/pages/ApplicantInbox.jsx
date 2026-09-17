@@ -318,7 +318,7 @@ export default function ApplicantInbox() {
                   <div className="message-item-header">
                     <span className="message-sender">
                       {message.sender_type === 'foundation' ? '🏛️ ' : '👤 '}
-                      {message.sender_type === 'foundation' ? 'Schmitz-Stiftungen' : message.sender_name}
+                      {message.sender_type === 'foundation' ? 'AppliCheck' : message.sender_name}
                     </span>
                     <span className="message-time">
                       {new Date(message.sent_at).toLocaleDateString()}
@@ -419,7 +419,7 @@ export default function ApplicantInbox() {
 
               <div className="message-detail-meta">
                 <div className="message-from">
-                  <strong>From:</strong> {selectedMessage.sender_type === 'foundation' ? 'Schmitz-Stiftungen' : selectedMessage.sender_name}
+                  <strong>From:</strong> {selectedMessage.sender_type === 'foundation' ? 'AppliCheck' : selectedMessage.sender_name}
                 </div>
                 <div className="message-date">
                   {new Date(selectedMessage.sent_at).toLocaleString()}
