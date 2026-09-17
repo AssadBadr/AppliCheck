@@ -524,6 +524,7 @@ export default function CaseworkerDashboard() {
           )}
           <button className="refresh-btn" onClick={fetchApplications}>⟳ Refresh</button>
           <button className="btn-inbox" onClick={() => navigate('/foundation-inbox')}>📬 Inbox</button>
+          <button className="btn-inbox" onClick={() => navigate('/apply')}>📝 Apply</button>
           <button className="reset-btn" onClick={handleResetDemo}>↺ Restart Demo</button>
         </div>
       </header>
