@@ -1713,3 +1713,28 @@ header h1 {
   margin: 0;
   line-height: 1.5;
 }
+
+/* Auto-verification status inside doc expanded panel */
+.doc-auto-status {
+  margin-top: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.auto-status-ok {
+  color: #059669;
+  background: #ecfdf5;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  display: block;
+  border: 1.5px solid #6ee7b7;
+}
+.auto-status-fail {
+  color: #b45309;
+  background: #fffbeb;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  display: block;
+  border: 1.5px solid #fde68a;
+}

@@ -674,17 +674,14 @@ export default function CaseworkerDashboard() {
                                   {doc.url === '#simulated' ? '✓ Document accepted' : 'Preview not available — use "Open source document" to view'}
                                 </p>
                               </div>
-                              {/* Caseworker action: mark valid */}
-                              {doc.submitted && !doc.valid && !usingDemo && (
-                                <div className="doc-action-row">
-                                  <button
-                                    className="mark-valid-btn"
-                                    onClick={() => handleMarkValid(selectedApp, key, dbColMap[key])}
-                                  >
-                                    ✓ Accept this document
-                                  </button>
-                                </div>
-                              )}
+                              {/* Auto-verification status — no manual accept needed */}
+                              <div className="doc-auto-status">
+                                {doc.valid ? (
+                                  <span className="auto-status-ok">✓ Automatically verified by AppliCheck</span>
+                                ) : (
+                                  <span className="auto-status-fail">⚠ Issue detected automatically — notify applicant below</span>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <div className="doc-evidence-empty">

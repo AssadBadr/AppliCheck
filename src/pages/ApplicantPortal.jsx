@@ -49,6 +49,7 @@ export default function ApplicantPortal() {
   const [uploadProgress, setUploadProgress] = useState({})
   const [files, setFiles] = useState({ registration: null, activity_plan: null, responsible_person_signoff: null })
   const [validating, setValidating] = useState({})
+  const [fileErrors, setFileErrors] = useState({})
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const handleFileChange = async (docId, file) => {
@@ -59,19 +60,21 @@ export default function ApplicantPortal() {
 
     setValidating(prev => ({ ...prev, [docId]: true }))
     setError(null)
+    setFileErrors(prev => ({ ...prev, [docId]: null }))
 
     try {
       // Smart document validation - detect if wrong file type uploaded
       const validation = await validateDocumentType(file, docId)
       if (!validation.isValid) {
-        setError(validation.message)
+        setFileErrors(prev => ({ ...prev, [docId]: validation.message }))
         setValidating(prev => ({ ...prev, [docId]: false }))
         return
       }
 
+      setFileErrors(prev => ({ ...prev, [docId]: null }))
       setFiles(prev => ({ ...prev, [docId]: file }))
     } catch (err) {
-      setError('Error validating document. Please try again.')
+      setFileErrors(prev => ({ ...prev, [docId]: 'Error validating document. Please try again.' }))
     } finally {
       setValidating(prev => ({ ...prev, [docId]: false }))
     }
