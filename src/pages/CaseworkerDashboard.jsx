@@ -268,21 +268,19 @@ export default function CaseworkerDashboard() {
     // Always update local state immediately for instant feedback
     setApplications(prev => prev.map(a => {
       if (a.fullId !== app.fullId) return a
-      const updatedDocs = a.docs.map(d => {
-        if (d.key !== docKey) return d
-        return { ...d, valid: true, notes: '' }
-      })
-      const allValid = updatedDocs.every(d => d.valid)
-      return { ...a, docs: updatedDocs, status: allValid ? 'review_ready' : a.status }
+      const updatedDocuments = { ...a.documents }
+      if (updatedDocuments[docKey]) {
+        updatedDocuments[docKey] = { ...updatedDocuments[docKey], valid: true, notes: '' }
+      }
+      return { ...a, documents: updatedDocuments }
     }))
     setSelectedApp(prev => {
       if (!prev || prev.fullId !== app.fullId) return prev
-      const updatedDocs = prev.docs.map(d => {
-        if (d.key !== docKey) return d
-        return { ...d, valid: true, notes: '' }
-      })
-      const allValid = updatedDocs.every(d => d.valid)
-      return { ...prev, docs: updatedDocs, status: allValid ? 'review_ready' : prev.status }
+      const updatedDocuments = { ...prev.documents }
+      if (updatedDocuments[docKey]) {
+        updatedDocuments[docKey] = { ...updatedDocuments[docKey], valid: true, notes: '' }
+      }
+      return { ...prev, documents: updatedDocuments }
     })
 
     // Also persist to Supabase if not demo
