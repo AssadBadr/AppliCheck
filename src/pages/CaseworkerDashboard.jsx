@@ -785,6 +785,9 @@ export default function CaseworkerDashboard() {
                     <button className="btn-approve" onClick={handleApproveApplication}>
                       ✓ Approve application
                     </button>
+                    <button className="btn-reject" onClick={handleRejectApplication}>
+                      ✗ Not approved
+                    </button>
                   </div>
                   <p className="decision-note">Decisions are final. A notification will be sent to the applicant.</p>
                 </section>
