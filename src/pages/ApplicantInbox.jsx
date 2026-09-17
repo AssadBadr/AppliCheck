@@ -21,21 +21,45 @@ export default function ApplicantInbox() {
   async function fetchData() {
     try {
       // Support both short ref ID (8 chars) and full UUID
-      let query = supabase.from('grant_applications').select('*')
-      if (id.length === 8) {
-        // Short ref ID — fetch all and find matching
-        const { data: allApps, error: allErr } = await supabase
-          .from('grant_applications').select('*')
-        if (allErr) throw allErr
-        const match = allApps?.find(a => a.id.replace(/-/g, '').slice(0, 8).toUpperCase() === id.toUpperCase())
-        if (!match) throw new Error('Application not found for ref ID: ' + id)
-        query = supabase.from('grant_applications').select('*').eq('id', match.id).single()
+      let appData = null
+
+      if (id.length <= 8) {
+        // Short ref ID — search Supabase
+        const { data: allApps } = await supabase.from('grant_applications').select('*')
+        appData = allApps?.find(a => a.id.replace(/-/g, '').slice(0, 8).toUpperCase() === id.toUpperCase())
+
+        // Fallback: check initial.json demo data
+        if (!appData) {
+          const demoApps = (await import('../data/initial.json')).default.applications
+          const demoMatch = demoApps.find(a =>
+            a.id.replace(/-/g, '').slice(0, 8).toUpperCase() === id.toUpperCase() ||
+            a.id.toUpperCase() === id.toUpperCase()
+          )
+          if (demoMatch) {
+            // Map demo format to Supabase format so the UI works
+            appData = {
+              id: demoMatch.id,
+              applicant_name: demoMatch.organizationName,
+              organization_name: demoMatch.organizationName,
+              contact_email: demoMatch.contactEmail,
+              status: demoMatch.status,
+              submitted_at: demoMatch.submittedDate,
+              registration_valid: demoMatch.documents?.registration?.valid || false,
+              registration_notes: demoMatch.documents?.registration?.notes || '',
+              activity_plan_valid: demoMatch.documents?.activityPlan?.valid || false,
+              activity_plan_notes: demoMatch.documents?.activityPlan?.notes || '',
+              signoff_valid: demoMatch.documents?.responsiblePersonSignoff?.valid || false,
+              signoff_notes: demoMatch.documents?.responsiblePersonSignoff?.notes || '',
+            }
+          }
+        }
       } else {
-        query = query.eq('id', id).single()
+        const { data, error } = await supabase.from('grant_applications').select('*').eq('id', id).single()
+        if (error) throw error
+        appData = data
       }
 
-      const { data: appData, error: appError } = await query
-      if (appError) throw appError
+      if (!appData) throw new Error('Application not found for ref ID: ' + id)
       setApplication(appData)
 
       // Fetch messages using the real full UUID

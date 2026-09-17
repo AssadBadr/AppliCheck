@@ -20,11 +20,36 @@ export default function ApplicantStatus() {
   const [lastRefresh, setLastRefresh] = useState(null)
 
   const fetchStatus = async () => {
-    // Support short ref ID (8 chars) or full UUID
     let appData = null
-    if (id.length === 8) {
+
+    if (id.length <= 8) {
       const { data: allApps } = await supabase.from('grant_applications').select('*')
       appData = allApps?.find(a => a.id.replace(/-/g, '').slice(0, 8).toUpperCase() === id.toUpperCase())
+
+      // Fallback to initial.json demo data
+      if (!appData) {
+        const demoApps = (await import('../data/initial.json')).default.applications
+        const demoMatch = demoApps.find(a =>
+          a.id.replace(/-/g, '').slice(0, 8).toUpperCase() === id.toUpperCase() ||
+          a.id.toUpperCase() === id.toUpperCase()
+        )
+        if (demoMatch) {
+          appData = {
+            id: demoMatch.id,
+            applicant_name: demoMatch.organizationName,
+            organization_name: demoMatch.organizationName,
+            contact_email: demoMatch.contactEmail,
+            status: demoMatch.status,
+            submitted_at: demoMatch.submittedDate,
+            registration_valid: demoMatch.documents?.registration?.valid || false,
+            registration_notes: demoMatch.documents?.registration?.notes || '',
+            activity_plan_valid: demoMatch.documents?.activityPlan?.valid || false,
+            activity_plan_notes: demoMatch.documents?.activityPlan?.notes || '',
+            signoff_valid: demoMatch.documents?.responsiblePersonSignoff?.valid || false,
+            signoff_notes: demoMatch.documents?.responsiblePersonSignoff?.notes || '',
+          }
+        }
+      }
     } else {
       const { data } = await supabase.from('grant_applications').select('*').eq('id', id).single()
       appData = data
@@ -36,7 +61,6 @@ export default function ApplicantStatus() {
       return
     }
 
-    // Fetch messages using the real full UUID
     const { data: msgData } = await supabase
       .from('messages')
       .select('*')
