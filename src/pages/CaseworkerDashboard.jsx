@@ -265,18 +265,38 @@ export default function CaseworkerDashboard() {
   }
 
   const handleMarkValid = async (app, docKey, dbCol) => {
-    if (usingDemo) return
-    try {
-      const patch = { [dbCol]: true, [`${dbCol.replace('_valid', '_notes')}`]: '' }
-      const { error } = await supabase
-        .from('grant_applications')
-        .update(patch)
-        .eq('id', app.fullId)
-      if (error) throw error
-      await fetchApplications()
-    } catch (err) {
-      console.error('Error marking document as valid:', err)
-      alert('Error updating document: ' + err.message)
+    // Always update local state immediately for instant feedback
+    setApplications(prev => prev.map(a => {
+      if (a.fullId !== app.fullId) return a
+      const updatedDocs = a.docs.map(d => {
+        if (d.key !== docKey) return d
+        return { ...d, valid: true, notes: '' }
+      })
+      const allValid = updatedDocs.every(d => d.valid)
+      return { ...a, docs: updatedDocs, status: allValid ? 'review_ready' : a.status }
+    }))
+    setSelectedApp(prev => {
+      if (!prev || prev.fullId !== app.fullId) return prev
+      const updatedDocs = prev.docs.map(d => {
+        if (d.key !== docKey) return d
+        return { ...d, valid: true, notes: '' }
+      })
+      const allValid = updatedDocs.every(d => d.valid)
+      return { ...prev, docs: updatedDocs, status: allValid ? 'review_ready' : prev.status }
+    })
+
+    // Also persist to Supabase if not demo
+    if (!usingDemo) {
+      try {
+        const patch = { [dbCol]: true, [`${dbCol.replace('_valid', '_notes')}`]: '' }
+        const { error } = await supabase
+          .from('grant_applications')
+          .update(patch)
+          .eq('id', app.fullId)
+        if (error) throw error
+      } catch (err) {
+        console.error('Error persisting to Supabase:', err)
+      }
     }
   }
 
