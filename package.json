@@ -1,0 +1,33 @@
+{
+  "name": "projet1",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0",
+    "@supabase/supabase-js": "^2.116.0",
+    "dotenv": "^17.4.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "pdf-lib": "^1.17.1",
+    "vite": "^8.3.0"
+  },
+  "description": "**DaiL Casablanca AI Lab — Octopus Day Hackathon**   **Challenge:** The application is incomplete, but the applicant does not know why",
+  "main": "check-notifications.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

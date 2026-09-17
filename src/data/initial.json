@@ -1,0 +1,71 @@
+{
+  "applications": [
+    {
+      "id": "APP-001",
+      "organizationName": "Learning Workshop A",
+      "submittedDate": "2026-09-10T14:30:00Z",
+      "contactEmail": "contact@learningworkshopa.org",
+      "status": "under_review",
+      "documents": {
+        "registration": {
+          "submitted": true,
+          "valid": true,
+          "submittedName": "Learning Workshop A",
+          "notes": ""
+        },
+        "activityPlan": {
+          "submitted": true,
+          "valid": true,
+          "notes": ""
+        },
+        "responsiblePersonSignoff": {
+          "submitted": false,
+          "valid": false,
+          "notes": "Document not provided"
+        }
+      }
+    },
+    {
+      "id": "APP-002",
+      "organizationName": "Community Workshop B",
+      "submittedDate": "2026-09-12T09:15:00Z",
+      "contactEmail": "admin@communityworkshopb.org",
+      "status": "under_review",
+      "documents": {
+        "registration": {
+          "submitted": true,
+          "valid": true,
+          "submittedName": "Community Workshop B",
+          "notes": ""
+        },
+        "activityPlan": {
+          "submitted": false,
+          "valid": false,
+          "notes": "Document not provided"
+        },
+        "responsiblePersonSignoff": {
+          "submitted": false,
+          "valid": false,
+          "notes": "Document not provided"
+        }
+      }
+    }
+  ],
+  "requiredDocuments": [
+    {
+      "id": "registration",
+      "name": "Organization Registration Document",
+      "description": "Official registration proving legal status"
+    },
+    {
+      "id": "activityPlan",
+      "name": "Activity Plan",
+      "description": "Detailed plan of training activities and outcomes"
+    },
+    {
+      "id": "responsiblePersonSignoff",
+      "name": "Responsible Person Signoff",
+      "description": "Signature from authorized representative"
+    }
+  ]
+}
