@@ -472,7 +472,21 @@ export default function CaseworkerDashboard() {
       <header>
         <div>
           <div className="header-brand">
-            <h1>AppliCheck</h1>
+            {/* AppliCheck logo */}
+            <div className="applicheck-logo">
+              <svg width="36" height="36" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Blue accent page behind */}
+                <rect x="8" y="14" width="32" height="40" rx="5" fill="#6b9eff" opacity="0.7"/>
+                {/* Dark main document */}
+                <rect x="16" y="8" width="34" height="44" rx="5" fill="#1e2b3c"/>
+                {/* Folded corner */}
+                <path d="M40 8 L50 18 L40 18 Z" fill="#6b9eff" opacity="0.85"/>
+                <path d="M40 8 L50 18 L40 18 Z" fill="white" opacity="0.15"/>
+                {/* Checkmark */}
+                <path d="M25 32 L30 37 L40 26" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <h1>Applicheck</h1>
+            </div>
             <span className="gmail-badge">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="white" strokeWidth="2" fill="none"/>
