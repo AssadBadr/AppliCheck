@@ -325,7 +325,6 @@ export default function CaseworkerDashboard() {
 
   const handleApproveApplication = async () => {
     if (usingDemo) {
-      // Demo mode: update local state only
       setApplications(prev => prev.map(a =>
         a.id === selectedApp.id ? { ...a, status: 'approved' } : a
       ))
@@ -339,18 +338,22 @@ export default function CaseworkerDashboard() {
         .eq('id', selectedApp.fullId)
       if (updateError) throw updateError
 
-      const { error: msgError } = await supabase.from('messages').insert({
+      // Non-blocking message
+      supabase.from('messages').insert({
         application_id: selectedApp.fullId,
         sender_type:    'foundation',
         sender_name:    'AppliCheck',
         subject:        `Application Approved — Ref ${selectedApp.id}`,
         body: `Dear ${selectedApp.applicantName},\n\nYour grant application (Ref: ${selectedApp.id}) has been approved by the programme review committee.\n\nA member of our team will be in touch within 2–3 business days to discuss next steps.\n\nKind regards,\nAppliCheck`,
         read: false,
-      })
-      if (msgError) throw msgError
+      }).then(({ error }) => { if (error) console.warn('Approval message failed:', error.message) })
 
-      await fetchApplications()
+      // Update local state immediately
+      setApplications(prev => prev.map(a =>
+        a.fullId === selectedApp.fullId ? { ...a, status: 'approved' } : a
+      ))
       setSelectedApp(null)
+      fetchApplications()
     } catch (err) {
       console.error('Error approving application:', err)
       alert('Error approving application: ' + err.message)
@@ -373,18 +376,23 @@ export default function CaseworkerDashboard() {
         .eq('id', selectedApp.fullId)
       if (updateError) throw updateError
 
-      const { error: msgError } = await supabase.from('messages').insert({
+      // Non-blocking — don't let message failure block the status update
+      supabase.from('messages').insert({
         application_id: selectedApp.fullId,
         sender_type:    'foundation',
         sender_name:    'AppliCheck',
         subject:        `Application Outcome — Ref ${selectedApp.id}`,
         body: `Dear ${selectedApp.applicantName},\n\nThank you for submitting your application (Ref: ${selectedApp.id}).\n\nAfter careful review by our committee, we regret to inform you that your application has not been selected for funding in this cycle.\n\nWe encourage you to consider reapplying in the next funding round. Please don't hesitate to contact us if you have any questions.\n\nKind regards,\nAppliCheck`,
         read: false,
-      })
-      if (msgError) throw msgError
+      }).then(({ error }) => { if (error) console.warn('Rejection message failed:', error.message) })
 
-      await fetchApplications()
+      // Update local state immediately — don't wait for re-fetch
+      setApplications(prev => prev.map(a =>
+        a.fullId === selectedApp.fullId ? { ...a, status: 'rejected' } : a
+      ))
       setSelectedApp(null)
+      // Also re-fetch in background to sync
+      fetchApplications()
     } catch (err) {
       console.error('Error rejecting application:', err)
       alert('Error rejecting application: ' + err.message)
