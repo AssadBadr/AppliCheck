@@ -339,3 +339,287 @@
     padding: 1.5rem;
   }
 }
+
+/* ── Missing classes added ─────────────────────────────────── */
+
+/* Loading spinner (JSX uses .status-spinner, CSS had .status-loading-spinner) */
+.status-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Error card (JSX uses .status-error-card, CSS had .status-error) */
+.status-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.status-error-card .error-icon { font-size: 3rem; }
+
+.status-error-card h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ef4444;
+}
+
+.status-error-card p { color: #64748b; }
+
+/* Header right side */
+.status-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Refresh label */
+.refresh-label {
+  font-size: 0.8125rem;
+  color: rgba(255,255,255,0.7);
+}
+
+/* Org info row */
+.status-org-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.status-org-name {
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 0.375rem;
+}
+
+.status-org-meta {
+  font-size: 0.9375rem;
+  color: #64748b;
+}
+
+.status-ref {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  padding: 0.875rem 1.25rem;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.status-ref span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.status-ref strong {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 2px;
+}
+
+/* Section title */
+.status-section-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+/* Message count badge */
+.msg-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Doc item info column (JSX uses .status-doc-info, CSS had .status-doc-content) */
+.status-doc-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.status-doc-info strong {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Doc icon with state colour (JSX passes no state class to icon, apply via parent) */
+.status-doc-item.accepted .status-doc-icon {
+  background: #10b981;
+  color: white;
+}
+
+.status-doc-item.flagged .status-doc-icon {
+  background: #f59e0b;
+  color: white;
+}
+
+.status-doc-item.missing .status-doc-icon {
+  background: #ef4444;
+  color: white;
+}
+
+/* State labels */
+.doc-state-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.625rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  width: fit-content;
+}
+
+.doc-state-label.accepted { background: #d1fae5; color: #065f46; }
+.doc-state-label.flagged  { background: #fef3c7; color: #92400e; }
+.doc-state-label.missing  { background: #fee2e2; color: #991b1b; }
+
+/* View file link */
+.view-file-link {
+  font-size: 0.8125rem;
+  color: #3b82f6;
+  text-decoration: none;
+  margin-top: 0.25rem;
+}
+.view-file-link:hover { text-decoration: underline; }
+
+/* All done banner */
+.status-all-done {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  color: #065f46;
+  font-weight: 600;
+}
+
+.status-all-done span {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #10b981;
+}
+
+/* Message meta row */
+.message-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.625rem;
+  gap: 1rem;
+}
+
+.message-from {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+/* Action hint below message */
+.message-action-hint {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 0.875rem;
+  font-style: italic;
+}
+
+/* No messages hint */
+.no-msg-hint {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin-top: 0.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+/* Refresh button in status page */
+.btn-refresh {
+  padding: 0.625rem 1.25rem;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 10px;
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-refresh:hover {
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+/* Back link for status page */
+.status-header-left .back-link {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.8);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.status-header-left .back-link:hover { color: white; }
+
+/* btn-primary for error card */
+.status-error-card .btn-primary {
+  margin-top: 1rem;
+  padding: 0.875rem 2rem;
+  background: linear-gradient(135deg, #6c63ff 0%, #4f46e5 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.status-error-card .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(79,70,229,0.3);
+}

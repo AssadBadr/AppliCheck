@@ -147,7 +147,7 @@ export default function ApplicantInbox() {
       const { error } = await supabase
         .from('messages')
         .insert({
-          application_id: id,
+          application_id: application?.id || id,
           sender_type: 'applicant',
           sender_name: application.applicant_name,
           subject: subject,

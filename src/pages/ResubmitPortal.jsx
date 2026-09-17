@@ -189,7 +189,7 @@ export default function ResubmitPortal() {
         .from('grant_applications')
         .select('*')
         .ilike('organization_name', `%${name}%`)
-        .ilike('contact_email', `%${mail}%`)
+        .eq('contact_email', mail)
 
       if (error) throw error
 
